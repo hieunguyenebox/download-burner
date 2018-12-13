@@ -1,0 +1,29 @@
+{
+  "name": "download-burner",
+  "version": "1.0.0",
+  "description": "download file as fast as possible",
+  "main": "dist",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hieunguyenebox/download-burner.git"
+  },
+  "keywords": [
+    "download",
+    "burner",
+    "download",
+    "downloader",
+    "fastest",
+    "downloader",
+    "download",
+    "file"
+  ],
+  "author": "hieunguyenebox",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/hieunguyenebox/download-burner/issues"
+  },
+  "homepage": "https://github.com/hieunguyenebox/download-burner#readme"
+}
