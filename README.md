@@ -27,6 +27,8 @@ FlashGetter
 	.catch(err => console.log(err))
 
 
+```
+
 
 *** options
 |Key|Value|Default Value
@@ -37,5 +39,3 @@ FlashGetter
 
 *** Return Value
 Promise with file path of file on your machine
-
-```
