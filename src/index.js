@@ -50,11 +50,12 @@ export class FlashGetter {
 	}
 
 	createDownloadTask = (from, length, filename, cb) => {
+
 		
 		const options = {
 			uri: this.uri,
 			headers: {
-				Range: `bytes=${from}-${from + length}`,
+				Range: `bytes=${from}-${length ? from + length : ''}`,
 			}
 		}
 
@@ -206,40 +207,45 @@ export class FlashGetter {
 	}
 
 
-	createAppendTask = (writeStream, filename, cb) => {
+	createAppendTask = (destFile, filename, cb) => {
 
 		const readStream = fs.createReadStream(filename)
+			, writeStream = fs.createWriteStream(destFile, { 'flags': 'a' });
 
 		readStream.pipe(writeStream)
 
-		readStream.on('finish', () => {
+		readStream.on('close', () => {
 
 			fs.unlink(filename, err => {
 
 				cb()
 			})
 		})
+
+		readStream.on('error', err => err && console.log(err))
 	}
 
-	createJoinTasks = (files, writeStream) => {
+	createJoinTasks = (files, destFile) => {
 
-		return files.map(file => cb => this.createAppendTask(writeStream, file, cb))
+		return files.map(file => cb => this.createAppendTask(destFile, file, cb))
 	}
 
 	joinFiles = files => {
 		
-		const file = this.getNewFileName()
+		const newName = this.getNewFileName()
 			, dest = this.getDestPath();
 
-		const destFile = `${dest}/${newName}`
 
-		const writeStream = fs.createWriteStream(destFile);
+		let destFile = `${dest}/${newName}`
 
-		const tasks = this.createJoinTasks(files, writeStream)
+		if (fs.existsSync(destFile))
+			destFile = `${dest}/${Date.now()}_${newName}`
+
+		const tasks = this.createJoinTasks(files, destFile)
 
 		return series(tasks).then(() => {
 
-			fs.unlink(this.tmpDir, () => {})
+			fs.rmdir(this.tmpDir, () => {})
 		})
 	}
 

@@ -96,7 +96,7 @@ var FlashGetter = exports.FlashGetter = function () {
 			var options = {
 				uri: _this.uri,
 				headers: {
-					Range: 'bytes=' + from + '-' + (from + length)
+					Range: 'bytes=' + from + '-' + (length ? from + length : '')
 				}
 			};
 
@@ -255,44 +255,49 @@ var FlashGetter = exports.FlashGetter = function () {
 			return tasks;
 		};
 
-		this.createAppendTask = function (writeStream, filename, cb) {
+		this.createAppendTask = function (destFile, filename, cb) {
 
-			var readStream = _fs2.default.createReadStream(filename);
+			var readStream = _fs2.default.createReadStream(filename),
+			    writeStream = _fs2.default.createWriteStream(destFile, { 'flags': 'a' });
 
 			readStream.pipe(writeStream);
 
-			readStream.on('finish', function () {
+			readStream.on('close', function () {
 
 				_fs2.default.unlink(filename, function (err) {
 
 					cb();
 				});
 			});
+
+			readStream.on('error', function (err) {
+				return err && console.log(err);
+			});
 		};
 
-		this.createJoinTasks = function (files, writeStream) {
+		this.createJoinTasks = function (files, destFile) {
 
 			return files.map(function (file) {
 				return function (cb) {
-					return _this.createAppendTask(writeStream, file, cb);
+					return _this.createAppendTask(destFile, file, cb);
 				};
 			});
 		};
 
 		this.joinFiles = function (files) {
 
-			var file = _this.getNewFileName(),
+			var newName = _this.getNewFileName(),
 			    dest = _this.getDestPath();
 
 			var destFile = dest + '/' + newName;
 
-			var writeStream = _fs2.default.createWriteStream(destFile);
+			if (_fs2.default.existsSync(destFile)) destFile = dest + '/' + Date.now() + '_' + newName;
 
-			var tasks = _this.createJoinTasks(files, writeStream);
+			var tasks = _this.createJoinTasks(files, destFile);
 
 			return series(tasks).then(function () {
 
-				_fs2.default.unlink(_this.tmpDir, function () {});
+				_fs2.default.rmdir(_this.tmpDir, function () {});
 			});
 		};
 
