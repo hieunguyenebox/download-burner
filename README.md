@@ -2,8 +2,8 @@
 
 ### Getting Started
 
-Easy to download files, even large files :)))
-Open 30 connections to download file if Range Request
+- Easy to download files, even large files :)))
+- Open 30 connections to download file if Range Request
 
 ### Installing
 
