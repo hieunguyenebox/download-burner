@@ -30,12 +30,12 @@ FlashGetter
 ```
 
 
-*** options
+### options
 |Key|Value|Default Value
 |---|-----|----
 |newName|new file name|file name of the url
 |headers|custom header|
 |dest|directory to store file|current dir
 
-*** Return Value
+> Return Value
 Promise with file path of file on your machine
