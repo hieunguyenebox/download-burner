@@ -181,14 +181,6 @@ var FlashGetter = exports.FlashGetter = function () {
 			return dest;
 		};
 
-		this.createDest = function (dest) {
-
-			return new Promise(function (resolve, reject) {
-
-				mkdir(dest);
-			});
-		};
-
 		this.startDownloading = function (dest) {
 
 			return new Promise(function (resolve, reject) {
@@ -200,7 +192,9 @@ var FlashGetter = exports.FlashGetter = function () {
 				(0, _requestPromise2.default)(_this.uri).pipe(writeStream);
 
 				writeStream.on('finish', function () {
-					return resolve('File has been downloaded');
+
+					console.log('Finish "' + _this.uri + '"');
+					resolve(dest);
 				}).on('error', function () {
 					return reject('Error to write file to disk');
 				});
@@ -216,7 +210,7 @@ var FlashGetter = exports.FlashGetter = function () {
 
 			if (!_fs2.default.existsSync(dest)) {
 
-				return _this.createDest(dest).then(function () {
+				return mkdir(dest).then(function () {
 					return _this.startDownloading(destFile);
 				});
 			}
@@ -293,11 +287,17 @@ var FlashGetter = exports.FlashGetter = function () {
 
 			if (_fs2.default.existsSync(destFile)) destFile = dest + '/' + Date.now() + '_' + newName;
 
-			var tasks = _this.createJoinTasks(files, destFile);
+			return mkdir(dest).then(function () {
 
-			return series(tasks).then(function () {
+				var tasks = _this.createJoinTasks(files, destFile);
 
-				_fs2.default.rmdir(_this.tmpDir, function () {});
+				return series(tasks).then(function () {
+
+					_fs2.default.rmdir(_this.tmpDir, function () {});
+					console.log('Finish "' + _this.uri + '"');
+
+					return destFile;
+				});
 			});
 		};
 
@@ -326,7 +326,7 @@ var FlashGetter = exports.FlashGetter = function () {
 
 			return (0, _requestPromise2.default)(opts).then(function (res) {
 
-				if (res.headers['accept-ranges'].includes('bytes')) {
+				if (res.headers['accept-ranges'] && res.headers['accept-ranges'].indexOf('bytes') !== -1) {
 
 					_this.partial = true;
 					_this.uriValid = true;

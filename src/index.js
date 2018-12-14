@@ -133,15 +133,6 @@ export class FlashGetter {
 		return dest
 	}
 
-
-	createDest = (dest) => {
-
-		return new Promise((resolve, reject) => {
-
-			mkdir(dest)
-		})
-	}
-
 	startDownloading = (dest) => {
 
 		return new Promise((resolve, reject) => {
@@ -153,7 +144,11 @@ export class FlashGetter {
 			request(this.uri).pipe(writeStream)
 
 			writeStream
-				.on('finish', () => resolve('File has been downloaded'))
+				.on('finish', () => {
+
+					console.log(`Finish "${this.uri}"`)
+					resolve(dest)
+				})
 				.on('error', () => reject('Error to write file to disk'))
 		})
 	}
@@ -167,7 +162,7 @@ export class FlashGetter {
 
 		if (!fs.existsSync(dest)) {
 
-			return this.createDest(dest).then(() => this.startDownloading(destFile))
+			return mkdir(dest).then(() => this.startDownloading(destFile))
 		}
 
 		return this.startDownloading(destFile)
@@ -235,17 +230,22 @@ export class FlashGetter {
 		const newName = this.getNewFileName()
 			, dest = this.getDestPath();
 
-
 		let destFile = `${dest}/${newName}`
 
 		if (fs.existsSync(destFile))
 			destFile = `${dest}/${Date.now()}_${newName}`
 
-		const tasks = this.createJoinTasks(files, destFile)
+		return mkdir(dest).then(() => {
 
-		return series(tasks).then(() => {
+			const tasks = this.createJoinTasks(files, destFile)
 
-			fs.rmdir(this.tmpDir, () => {})
+			return series(tasks).then(() => {
+
+				fs.rmdir(this.tmpDir, () => {})
+				console.log(`Finish "${this.uri}"`)
+				
+				return destFile
+			})
 		})
 	}
 
@@ -274,7 +274,7 @@ export class FlashGetter {
 		
 		return request(opts).then(res => {
 
-			if (res.headers['accept-ranges'].includes('bytes')) {
+			if (res.headers['accept-ranges'] && res.headers['accept-ranges'].indexOf('bytes') !== -1) {
 
 				this.partial = true
 				this.uriValid = true
