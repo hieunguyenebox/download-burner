@@ -1,29 +1,41 @@
 {
-  "name": "download-burner",
+  "name": "flash-getter",
   "version": "1.0.0",
   "description": "download file as fast as possible",
   "main": "dist",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "local": "NODE_ENV=local gulp build",
+    "build": "gulp build"
+  },
+  "devDependencies": {
+    "babel-core": "^6.26.0",
+    "babel-plugin-transform-class-properties": "^6.24.1",
+    "babel-plugin-transform-object-rest-spread": "^6.26.0",
+    "babel-preset-env": "^1.6.0",
+    "del": "^3.0.0",
+    "gulp": "4",
+    "gulp-babel": "^7.0.0"
+  },
+  "dependencies": {
+    "mime-types": "^2.1.21",
+    "babel-polyfill": "^6.26.0"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/hieunguyenebox/download-burner.git"
+    "url": "git+https://github.com/hieunguyenebox/flash-getter.git"
   },
   "keywords": [
     "download",
     "burner",
-    "download",
     "downloader",
     "fastest",
-    "downloader",
-    "download",
+    "getter",
     "file"
   ],
   "author": "hieunguyenebox",
   "license": "ISC",
   "bugs": {
-    "url": "https://github.com/hieunguyenebox/download-burner/issues"
+    "url": "https://github.com/hieunguyenebox/flash-getter/issues"
   },
-  "homepage": "https://github.com/hieunguyenebox/download-burner#readme"
+  "homepage": "https://github.com/hieunguyenebox/flash-getter#readme"
 }
