@@ -18,8 +18,7 @@ npm i --save flash-getter
 
 ```
 import FlashGetter from 'flash-getter'
-or
-const FlashGetter = require('flash-getter')
+// const FlashGetter = require('flash-getter')
 
 FlashGetter
 	.download(url, options)
