@@ -293,5 +293,5 @@ export const download = (uri, opts) => {
 	return (new FlashGetter).download(uri, opts)
 }
 
-export default download
+export default { download }
 

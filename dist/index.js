@@ -381,4 +381,4 @@ var download = exports.download = function download(uri, opts) {
 	return new FlashGetter().download(uri, opts);
 };
 
-exports.default = download;
+exports.default = { download: download };
