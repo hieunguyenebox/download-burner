@@ -17,8 +17,13 @@
     "gulp-babel": "^7.0.0"
   },
   "dependencies": {
+    "async": "^2.6.1",
+    "babel-polyfill": "^6.26.0",
+    "md5": "^2.2.1",
     "mime-types": "^2.1.21",
-    "babel-polyfill": "^6.26.0"
+    "nanoid": "^2.0.0",
+    "request": "^2.88.0",
+    "request-promise": "^4.2.2"
   },
   "repository": {
     "type": "git",

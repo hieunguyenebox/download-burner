@@ -2,155 +2,330 @@
 import request from 'request-promise'
 import fs from 'fs'
 import path from 'path'
-import Joiner from './joiner'
 import md5 from 'md5'
 import nanoid from 'nanoid'
-import { parallel } from 'async'
+import async from 'async'
+import { promisify } from 'util'
+import 'babel-polyfill'
+import { exec } from 'child_process'
 
-class FlashGetter {
+const parallel = promisify(async.parallel)
+	, series = promisify(async.series)
 
-	tmpDir = path.resolve(__dirname, md5(nanoid(12)))
+const mkdir = pathDir => {
 
-	appendHeaders = opts => {
+	return new Promise((resolve, reject) => {
 
-		if (this.opts.headers && typeof this.opts.headers === 'object')
-			opts.headers = {...this.opts.headers, ...opts.headers}
+		exec(`mkdir -p ${pathDir}`, (err,stdout,stderr) => {
 
-		return opts
+			if (err) reject(`Cannot create on ${pathDir}`)
+
+			resolve()
+		})
+	})
+}
+
+export class FlashGetter {
+
+	tmpDir = ''
+	uri = ''
+	opts = {}
+	partial = false
+	uriValid = false
+
+	appendHeaders = headers => {
+
+		const opts = this.opts
+
+		headers['User-Agent'] = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.110 Safari/537.36'
+
+		if (opts && typeof opts === 'object') {
+
+			const { headers: userConfigHeaders } = opts
+
+			headers = {...userConfigHeaders, ...headers}
+		}
+
+		return headers
 	}
 
 	createDownloadTask = (from, length, filename, cb) => {
 		
-		let options = {
-			this.uri,
+		const options = {
+			uri: this.uri,
 			headers: {
-				Range: `bytes=${from}-${length}`,
+				Range: `bytes=${from}-${from + length}`,
 			}
 		}
 
-		options = this.appendHeaders(options)
+		options.headers = this.appendHeaders(options.headers)
 
-		const tmpWriteStream = fs.createWriteStream(this.tmpDir, filename)
+		const tmpWriteStream = fs.createWriteStream(`${this.tmpDir}/${filename}`)
 
-		tmpWriteStream.once('close', cb)
+		tmpWriteStream.once('close', () => {
+
+			cb(null, `${this.tmpDir}/${filename}`)
+		})
+
 		request(options).pipe(tmpWriteStream)
 	}
 
-	download = () => {
+	createTmpDir = () => {
 
-		const downloadLength = Math.ceil(length / connection)
+		this.tmpDir = path.resolve(process.cwd(), `tmp/${md5(nanoid(12))}`)
 
-		let from = 0, to = downloadLength
+		return mkdir(this.tmpDir)
+	}
 
-		var tasks = []
+	download = async (uri, opts) => {
 
-		for (let i = 0; i < connection; i++) {
+		this.opts = opts || {}
+		this.uri = uri
 
-			let end = to, start = from
+		await this.getURIInfo()
 
-			if (i === connection - 1)
-				end = ''
+		if (this.uriValid)
+			return this.process()
+		else
+			return Promise.reject('Cannot get the file. Please check url.')
 
-			if (from >= length)
-				return;
+	}
+
+	async process () {
+
+		if (this.partial) {
+
+			return this.createTmpDir().then(this.downloadPartials)
+
+		} else {
+
+			return this.downloadSingle()
+		}
+	}
+
+	getNewFileName = () => {
+
+		let { newName } = this.opts
+
+		if (!newName)
+			newName = this.uri.split('/').pop()
+
+		return newName.replace(/[\\\/]+/, '_')
+	}
+
+	getDestPath = () => {
+
+		let { dest = '' } = this.opts
+
+		if (dest) {
+
+			if (dest.indexOf('/') !== 0)
+				dest = path.resolve(process.cwd(), dest)
+			else
+				dest = path.resolve(dest, '')
+
+		} else {
+
+			dest = path.resolve(process.cwd(), '')
+		}
+
+		return dest
+	}
+
+
+	createDest = (dest) => {
+
+		return new Promise((resolve, reject) => {
+
+			mkdir(dest)
+		})
+	}
+
+	startDownloading = (dest) => {
+
+		return new Promise((resolve, reject) => {
+
+			console.log(`Downloading "${this.uri}"...`)
+
+			const writeStream = fs.createWriteStream(dest)
+
+			request(this.uri).pipe(writeStream)
+
+			writeStream
+				.on('finish', () => resolve('File has been downloaded'))
+				.on('error', () => reject('Error to write file to disk'))
+		})
+	}
+
+	downloadSingle = () => {
+
+		const newName = this.getNewFileName()
+			, dest = this.getDestPath();
+
+		const destFile = `${dest}/${newName}`
+
+		if (!fs.existsSync(dest)) {
+
+			return this.createDest(dest).then(() => this.startDownloading(destFile))
+		}
+
+		return this.startDownloading(destFile)
+	}
+
+	getConnectionNumber = () => {
+
+		let { connection } = this.opts
+
+		if (isNaN(connection) || connection > 30 || connection < 1)
+			connection = 30
+
+		return connection
+	}
+
+	createPartialDownloadTasks = () => {
+
+		const connNumber = this.getConnectionNumber()
+			, partialLength = Math.ceil(this.contentLength / connNumber)
+			, tasks = [];
+
+		for (let i = 0; i < connNumber; i++) {
 
 			// if start is 0, not plus 1, cause lost first byte
 			tasks.push((cb) => {
 
-				downloadTask(
-					start ? start + 1 : start,
-					end,
+				this.createDownloadTask(
+					i ? (i * partialLength) + i : 0,
+					i === connNumber - 1 ? '' : partialLength,
 					md5(`file_${i}`),
 					cb
 				)
 			})
-
-			from += downloadLength
-			to += downloadLength
-
-		}//end for
-
-		if (tasks.length) {
-
-			console.log('started downloading:', downloadFileName)
-			parallel(tasks)
 		}
+
+		return tasks
 	}
 
-	getContentLength = () => {
 
-		const opts = {
-			uri: uri,
-			method: 'HEAD',
-			headers: {
-				Range: 'bytes=0-',
-			},
-			resolveWithFullResponse: true
-		}
+	createAppendTask = (writeStream, filename, cb) => {
 
-		if (this.opts.headers && typeof this.opts.headers === 'object')
-			opts.headers = {...this.opts.headers, ...opts.headers}
+		const readStream = fs.createReadStream(filename)
 
-		request(opts).then(res => {
+		readStream.pipe(writeStream)
 
-			if (res.statusCode === 206)
-				this.contentLength = res.headers['content-length']
-			else
-				this.contentLength = 0
+		readStream.on('finish', () => {
 
+			fs.unlink(filename, err => {
+
+				cb()
+			})
 		})
 	}
 
-	get (uri, opts) {
+	createJoinTasks = (files, writeStream) => {
 
-		this.opts = opts
-		this.uri = uri
+		return files.map(file => cb => this.createAppendTask(writeStream, file, cb))
+	}
 
+	joinFiles = files => {
+		
+		const file = this.getNewFileName()
+			, dest = this.getDestPath();
+
+		const destFile = `${dest}/${newName}`
+
+		const writeStream = fs.createWriteStream(destFile);
+
+		const tasks = this.createJoinTasks(files, writeStream)
+
+		return series(tasks).then(() => {
+
+			fs.unlink(this.tmpDir, () => {})
+		})
+	}
+
+	downloadPartials = () => {
+
+		const tasks = this.createPartialDownloadTasks()
+
+		console.log(`Downloading "${this.uri}"...`)
+
+		return parallel(tasks).then(this.joinFiles)
+	}
+
+	getURIInfo = () => {
+
+		console.log(`Checking "${this.uri}"....`)
+
+		const opts = {
+			uri: this.uri,
+			method: 'HEAD',
+			headers: { Range: 'bytes=0-'},
+			resolveWithFullResponse: true,
+			simple: false
+		}
+
+		opts.headers = this.appendHeaders(opts.headers)
+		
+		return request(opts).then(res => {
+
+			if (res.headers['accept-ranges'].includes('bytes')) {
+
+				this.partial = true
+				this.uriValid = true
+				this.contentLength = res.headers['content-length']
+
+			} else {
+
+				this.uriValid = true
+			}
+		})
 	}
 }
 
+export const download = (uri, opts) => {
 
-const download = (filename, connection) => {
-
-	const tmpName = 
-
-	createTmpDir(tmpName)
-
-	if (!length)
-		return Promise.reject('File length is empty')
-
-	connection = connection > 50 ? 50 : connection
-
-	return Downloader({uri, headers: requestHeaders}, length, filename, connection)
-				.then(() => Joiner(filename, connection))
-				.then(() => {
-
-					//check size
-					var stats = fs.statSync(filename)
-
-					if (stats.size !== length) {
-
-						fs.unlinkSync(filename)
-						return Promise.reject('File size is incorrect')
-					}
-
-					let dirPath = path.resolve(__dirname, `tmp_${tmpName}`)
-
-					const files = fs.readdirSync(dirPath)
-
-					for (let fname of files) {
-						fs.unlinkSync(`${dirPath}/${fname}`)
-					}
-
-					fs.rmdir(dirPath)
-
-					return true
-				})
-				.catch(err => console.log(err))
-
+	return (new FlashGetter).download(uri, opts)
 }
 
-export default {
-	getInfo,
-	download
-}
+export default download
+
+
+// const download = (filename, connection) => {
+
+// 	const tmpName = 
+
+// 	createTmpDir(tmpName)
+
+// 	if (!length)
+// 		return Promise.reject('File length is empty')
+
+// 	connection = connection > 50 ? 50 : connection
+
+// 	return Downloader({uri, headers: requestHeaders}, length, filename, connection)
+// 				.then(() => Joiner(filename, connection))
+// 				.then(() => {
+
+// 					//check size
+// 					var stats = fs.statSync(filename)
+
+// 					if (stats.size !== length) {
+
+// 						fs.unlinkSync(filename)
+// 						return Promise.reject('File size is incorrect')
+// 					}
+
+// 					let dirPath = path.resolve(__dirname, `tmp_${tmpName}`)
+
+// 					const files = fs.readdirSync(dirPath)
+
+// 					for (let fname of files) {
+// 						fs.unlinkSync(`${dirPath}/${fname}`)
+// 					}
+
+// 					fs.rmdir(dirPath)
+
+// 					return true
+// 				})
+// 				.catch(err => console.log(err))
+
+// }
